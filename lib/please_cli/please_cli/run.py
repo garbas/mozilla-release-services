@@ -201,7 +201,38 @@ def cmd(ctx, project, quiet, nix_shell):
             'python', 'run.py',
         ]
 
-    elif run_type == 'ELM':
+    elif run_type == 'ELM_LIVE':
+        project_dir = os.path.join(please_cli.config.ROOT_DIR, 'src', project_name)
+        before_build_command = os.path.join(project_dir, 'before-build')
+        after_build_command = os.path.join(project_dir, 'after-build')
+        build_dir = os.path.join(project_dir, 'build')
+        output_file = os.path.join(build_dir, 'index.js')
+
+        if not os.path.isdir(build_dir):
+            os.makedirs(build_dir)
+
+        command = [
+            'elm-live',
+            '--host={}'.format(host),
+            '--port={}'.format(port),
+            '--output={}'.format(output_file),
+            '--dir={}'.format(build_dir),
+            '--pushstate',
+            '--debug',
+            os.path.join(project_dir, 'src', 'Main.elm'),
+        ]
+
+        if os.path.exists(before_build_command):
+            command += [
+                '--before-build={}'.format(before_build_command),
+            ]
+
+        if os.path.exists(after_build_command):
+            command += [
+                '--after-build={}'.format(after_build_command),
+            ]
+
+    elif run_type == 'ELM_WEBPACK':
 
         if not os.path.exists(ca_cert_file) or \
            not os.path.exists(server_cert_file) or \

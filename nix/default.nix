@@ -70,6 +70,7 @@ let
     "shipit-signoff" = import ./../src/shipit_signoff { inherit releng_pkgs; };
     "shipit-taskcluster" = import ./../src/shipit_taskcluster { inherit releng_pkgs; };
 
+    "bzlite-frontend" = import ./../src/bzlite_frontend { inherit releng_pkgs; };
   };
 
 in releng_pkgs

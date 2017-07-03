@@ -354,6 +354,166 @@ in rec {
           else false
         ) src;
 
+  mkFrontend2 =
+    { name
+    , version
+    , src
+    , src_path ? null
+    , csp ? "default-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; font-src 'self';"
+    , nodejs
+    , node_modules
+    , elm_packages
+    , patchPhase ? ""
+    , postInstall ? ""
+    , shellHook ? ""
+    , inStaging ? true
+    , inProduction ? false
+    }:
+    let
+      scss_common = ./../../lib/frontend_common/scss;
+      frontend_common = ./../../lib/frontend_common;
+      self = stdenv.mkDerivation {
+        name = "${name}-${version}";
+
+        src = builtins.filterSource
+          (path: type: baseNameOf path != "elm-stuff"
+                    && baseNameOf path != "node_modules"
+                    )
+          src;
+
+        buildInputs = [ nodejs elmPackages.elm ] ++ (builtins.attrValues node_modules);
+
+        patchPhase = ''
+          if [ -e src/scss ]; then
+            rm \
+              src/scss/fira \
+              src/scss/font-awesome \
+              src/scss/fonts.scss
+            ln -s ${scss_common}/fira         ./src/scss/
+            ln -s ${scss_common}/font-awesome ./src/scss/
+            ln -s ${scss_common}/fonts.scss   ./src/scss/
+          fi
+
+          for item in ./*; do
+            if [ -h $item ]; then
+              rm -f $item
+              cp ${frontend_common}/`basename $item` ./
+            fi
+          done
+
+          if [ -d src ]; then
+            for item in ./src/*; do
+              if [ -h $item ]; then
+                rm -f $item
+                cp ${frontend_common}/`basename $item` ./src/
+              fi
+            done
+          fi
+        '' + patchPhase;
+
+        configurePhase = ''
+          rm -rf node_modules
+          rm -rf elm-stuff
+        '' + (makeElmStuff elm_packages) + ''
+          mkdir node_modules
+          for item in ${builtins.concatStringsSep " " (builtins.attrValues node_modules)}; do
+            ln -s $item/lib/node_modules/* ./node_modules
+          done
+          export NODE_PATH=$PWD/node_modules:$NODE_PATH
+        '';
+
+        buildPhase = ''
+          webpack
+        '';
+
+        doCheck = true;
+
+        checkPhase = ''
+          if [ -d src/ ]; then
+            echo "----------------------------------------------------------"
+            echo "---  Running ... elm-format-0.18 src/ --validate  --------"
+            echo "----------------------------------------------------------"
+            elm-format-0.18 src/ --validate
+          fi
+          if [ -e Main.elm ]; then
+            echo "----------------------------------------------------------"
+            echo "---  Running ... elm-format-0.18 ./*.elm --validate  -----"
+            echo "----------------------------------------------------------"
+            elm-format-0.18 ./*.elm --validate
+          fi
+          echo "Everything OK!"
+          echo "----------------------------------------------------------"
+        '';
+
+        installPhase = ''
+          mkdir $out
+          cp build/* $out/ -R
+          sed -i -e "s|<head>|<head>\n  <meta http-equiv=\"Content-Security-Policy\" content=\"${csp}\">|" $out/index.html
+          runHook postInstall
+        '';
+
+        inherit postInstall;
+
+        shellHook = ''
+          cd ${self.src_path}
+          rm -rf build
+          mkdir -p build/
+          cd build/
+          ln -s ../src/index.html ./
+          ln -s ../src/static ./
+          cd ../
+        '' + self.configurePhase + shellHook;
+
+        passthru = {
+
+          deploy = {
+            staging = self;
+            production = self;
+          };
+
+          src_path =
+            if src_path != null
+              then src_path
+              else
+                "src/" +
+                  (replaceStrings ["-"] ["_"]
+                    (builtins.substring 8
+                      (builtins.stringLength name - 8) name));
+
+          taskclusterGithubTasks =
+            map (branch: mkTaskclusterGithubTask { inherit name branch; inherit (self) src_path; })
+                ([ "master" ] ++ optional inStaging "staging"
+                              ++ optional inProduction "production"
+                );
+
+          update = writeScript "update-${name}" ''
+            export SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt"
+            pushd "$SERVICES_ROOT"${self.src_path} >> /dev/null
+
+            ${node2nix}/bin/node2nix \
+              --composition node-modules.nix \
+              --input node-modules.json \
+              --output node-modules-generated.nix \
+              --node-env node-env.nix \
+              --flatten \
+              --pkg-name nodejs-6_x
+
+            rm -rf elm-stuff
+            n=0
+            until [ $n -ge 5 ]
+            do
+              ${elmPackages.elm}/bin/elm-package install -y
+              n=$[$n+1]
+              sleep 5
+            done
+            ${elm2nix}/bin/elm2nix elm-packages.nix
+
+            popd
+          '';
+        };
+      };
+    in self;
+
   mkFrontend =
     { name
     , version

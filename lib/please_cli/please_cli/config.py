@@ -56,6 +56,12 @@ with open('/proc/1/cgroup', 'rt') as ifh:
 
 # TODO: below data should be placed in src/<app>/default.nix files alongside
 PROJECTS = {
+    'bzlite-frontend': {
+        'run': 'ELM_LIVE',
+        'run_options': {
+            'port': 8080,
+        },
+    },
     'postgresql': {
         'run': 'POSTGRESQL',
         'run_options': {
@@ -178,7 +184,7 @@ PROJECTS = {
         }
     },
     'releng-frontend': {
-        'run': 'ELM',
+        'run': 'ELM_WEBPACK',
         'run_options': {
             'port': 8000,
         },
@@ -303,7 +309,7 @@ PROJECTS = {
         },
     },
     'shipit-frontend': {
-        'run': 'ELM',
+        'run': 'ELM_WEBPACK',
         'run_options': {
             'port': 8010,
             'envs': {
