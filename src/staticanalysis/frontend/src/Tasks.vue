@@ -5,7 +5,28 @@ import Choice from './Choice.vue'
 
 export default {
   mounted () {
-    this.$store.dispatch('load_index')
+    // Load new tasks at startup
+    this.load_tasks()
+  },
+  watch: {
+    '$route' (to, from, next) {
+      // Load new tasks when route change
+      this.load_tasks()
+    }
+  },
+  methods: {
+    load_tasks () {
+      var payload = {}
+
+      // Reset state
+      this.$store.commit('reset')
+
+      // Load a specific revision only
+      if (this.$route.params.revision) {
+        payload['revision'] = this.$route.params.revision
+      }
+      this.$store.dispatch('load_index', payload)
+    }
   },
   components: {
     Choice: Choice
@@ -55,7 +76,7 @@ export default {
       // Filter by revision
       if (this.filters.revision !== null) {
         tasks = _.filter(tasks, t => {
-          let payload = t.data.title + t.data.bugzilla_id + t.data.phid + t.data.diff_phid + t.data.id
+          let payload = t.data.title + t.data.bugzilla_id + t.data.phid + t.data.diff_phid + t.data.id + t.data.diff_id
           return payload.toLowerCase().indexOf(this.filters.revision.toLowerCase()) !== -1
         })
       }
@@ -114,10 +135,10 @@ export default {
             <p v-if="task.data.title">{{ task.data.title }}</p>
             <p class="has-text-danger" v-else>No title</p>
             <p>
-              <small class="mono has-text-grey-light">{{ task.data.diff_phid}}</small>
+              <small class="mono has-text-grey-light">{{ task.data.diff_phid}}</small> - diff {{ task.data.diff_id || 'unknown'     }}
             </p>
             <p>
-              <small class="mono has-text-grey-light">{{ task.data.phid}}</small> - rev {{ task.data.id }}
+              <small class="mono has-text-grey-light">{{ task.data.phid}}</small> - <router-link :to="{ name: 'revision', params: { revision: task.data.id }}">rev {{ task.data.id }}</router-link>
             </p>
           </td>
 
