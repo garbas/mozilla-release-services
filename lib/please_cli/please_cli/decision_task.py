@@ -482,7 +482,6 @@ def cmd(ctx,
         if project in please_cli.config.OUTSIDE_PROJECTS:
             continue
 
-        click.echo('     => ' + project)
 
         project_path = '/'.join(project.split('/')[:-1])
         project_path_end = project.split('/')[-1]
@@ -502,6 +501,8 @@ def cmd(ctx,
                 project_revisions[project] = item['sha']
                 break
 
+        click.echo(f'     => {project} ({project_revisions[project]})')
+
     click.echo(' => Gathering deployed projects revisions')
 
     deployed_projects = {}
@@ -511,7 +512,6 @@ def cmd(ctx,
         if project in please_cli.config.OUTSIDE_PROJECTS:
             continue
 
-        click.echo('     => ' + project)
 
         project = common_naming.Project(project)
         url = f'https://index.taskcluster.net/v1/task/project.releng.services.deployment.staging.{project.taskcluster_route_name}'
@@ -521,6 +521,8 @@ def cmd(ctx,
         response = r.json()
 
         deployed_projects[project.name] = response['data']
+
+        click.echo(f'     => {project.name} ({deployed_projects[project.name]["nix_hash"]})')
 
     projects_to_deploy = []
     if channel in please_cli.config.DEPLOY_CHANNELS:
